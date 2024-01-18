@@ -1,0 +1,277 @@
+---
+title: "Maternal Care Pathway Dashboard"
+output: html_document
+date: "2024-01-17"
+---
+
+```{r}
+library(tidyverse)
+library(readxl)
+library(shiny)
+library(ggplot2)
+library(shiny)
+library(shinydashboard)
+library(sf)
+library(plotly)
+
+data <- read_excel("fake_maternal_data.xlsx", sheet = 1)
+data$`Mean number of antenatal appointments` <- as.numeric(data$`Mean number of antenatal appointments`)
+
+amazon_map <- st_read("map.kml", drivers = "KML", quiet = TRUE)
+
+
+```
+
+
+```{r}
+#list of targets for indications
+maternal_mortality_target <- 70
+antenatal_target <- 5.4
+pilgrimage_target <- 24
+per_antenatal_target <- 65
+postnatal_target <- 88
+sti_target <- 73.5
+us_target <- 85
+education_target <- 63
+payment_target <- 65
+violence_target <- 18
+quality_target <- 85
+ix_target <- 100
+ix_change_target <- 8
+cs_target <- 15
+```
+
+```{r}
+kpi_count <- 0
+kpi_count <- ifelse(tail(data, 1)$mmr < maternal_mortality_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$no_of_antenatal > antenatal_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_pilgramage < pilgrimage_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_six_antenatal > per_antenatal_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_postnatal > postnatal_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_sti > sti_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_us > us_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_education > education_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_payment_transport < payment_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_violence < violence_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_quality_of_care > quality_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_deaths_ix > ix_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_cause_death_changed > ix_change_target, kpi_count + 1, kpi_count)
+kpi_count <- ifelse(tail(data, 1)$per_cs < cs_target, kpi_count + 1, kpi_count)
+
+
+fill_color_mmr <- ifelse(tail(data, 1)$mmr < maternal_mortality_target, "green", "red")
+fill_color_antenatal_no <- ifelse(tail(data, 1)$no_of_antenatal > antenatal_target, "green", "red")
+fill_color_pilgrimage <- ifelse(tail(data, 1)$per_pilgramage < pilgrimage_target, "green", "red")
+fill_color_antenatal_per <- ifelse(tail(data, 1)$per_six_antenatal > per_antenatal_target, "green", "red")
+fill_color_postnatal <- ifelse(tail(data, 1)$per_postnatal > postnatal_target, "green", "red")
+fill_color_sti <- ifelse(tail(data, 1)$per_sti > sti_target, "green", "red")
+fill_color_us <- ifelse(tail(data, 1)$per_us > us_target, "green", "red")
+fill_color_education <- ifelse(tail(data, 1)$per_education > education_target, "green", "red")
+fill_color_transport <- ifelse(tail(data, 1)$per_payment_transport < payment_target, "green", "red")
+fill_color_violence <- ifelse(tail(data, 1)$per_violence < violence_target, "green", "red")
+fill_color_quality <- ifelse(tail(data, 1)$per_quality_of_care > quality_target, "green", "red")
+fill_color_deaths_ix <- ifelse(tail(data, 1)$per_deaths_ix > ix_target, "green", "red")
+fill_color_deaths_ix_cause <- ifelse(tail(data, 1)$per_cause_death_changed > ix_change_target, "green", "red")
+fill_color_cs <- ifelse(tail(data, 1)$per_cs < cs_target, "green", "red")
+```
+
+
+```{r}
+#graph themes
+graph_theme <-   theme(
+    text = element_text(size = 14),  
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1), 
+    axis.text.y = element_text(size = 12),
+    plot.title = element_text(size = 16, face = "bold"), 
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank(),  
+    panel.background = element_rect(fill = "white"), 
+    axis.title.y = element_text(margin = margin(r = 20))
+  )
+
+```
+
+
+```{r}
+header <- dashboardHeader(title = "Key Performance Indicators for Maternal Health in Manaus", titleWidth = 700)
+
+sidebar <- dashboardSidebar(
+  sidebarMenu(
+    menuItem("Key Performance Indicators", tabName = "kpi"),
+    menuItem("Global Indicators", tabName = "global"),
+    menuItem("Prevention Indicators", tabName = "prevention"),
+    menuItem("Survey Indicators", tabName = "survey")
+  )
+)
+
+
+body <- dashboardBody(
+  tabItems(
+    tabItem(tabName = "kpi",
+  fluidRow(
+    box(
+      valueBox(
+        kpi_count,  
+        "of the 14 KPIs have been achieved in the last time of data collection"
+      ),
+      width = 50,
+      height = 500,
+      style = "font-size: 60px; text-align: center;",
+      value = "90k",
+      color = "purple"
+    )
+  )
+),
+  tabItem(tabName = "global",
+            fluidRow(
+    box(plotOutput("maternal_mortality"), background = fill_color_mmr),
+    box(plotOutput("per_deaths_ix"), background = fill_color_deaths_ix)),
+  fluidRow(
+    box(plotOutput("per_cause_death_changed"), background = fill_color_deaths_ix_cause),
+    box(plotOutput("per_cs"), background = fill_color_cs)
+  )),
+  tabItem(tabName = "prevention",
+          fluidRow(box(plotOutput("no_of_antenatal"), background = fill_color_antenatal_no),
+                   box(plotOutput("per_six_antenatal"), background = fill_color_antenatal_per)),
+          fluidRow(box(plotOutput("per_postnatal"), background = fill_color_postnatal),
+                   box(plotOutput("per_sti"), background = fill_color_sti)),
+          fluidRow(box(plotOutput("per_us"), background = fill_color_us))),
+  tabItem(tabName = "survey",
+          fluidRow(box(plotOutput("per_pilgramage"), background = fill_color_pilgrimage),
+                   box(plotOutput("per_education"), background = fill_color_education)),
+          fluidRow(box(plotOutput("per_payment_transport"), background = fill_color_transport),
+                   box(plotOutput("per_violence"), background = fill_color_violence)),
+          fluidRow(box(plotOutput("per_quality_of_care"), background = fill_color_quality)))
+))
+
+server <- function(input, output){
+  output$maternal_mortality <- renderPlot({
+    ggplot(data, aes(x = Month, y = mmr)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Maternal Mortality per 100,000 Live Births", title = "Maternal Mortality") +
+      geom_hline(yintercept = maternal_mortality_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+  })
+  output$no_of_antenatal <- renderPlot({
+    ggplot(data, aes(x = Month, y = no_of_antenatal)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Mean number of antenatal \nappointments", title = "Number of \nAntenatal Appointments") +
+      geom_hline(yintercept = antenatal_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+  })
+    output$per_pilgramage <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_pilgramage)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of women \nundergoing pilgrimage", title = "Pilgrimage") +
+      geom_hline(yintercept = pilgrimage_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+  })
+        output$per_six_antenatal <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_six_antenatal)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of women who \nhave had six antenatal appoinments", title = "All Six \nAntenatal Appointments") +
+      geom_hline(yintercept = per_antenatal_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    })
+      output$per_postnatal <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_postnatal)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of women who \nhave had a postnatal \nappoinment", title = "Postnatal Appointments") +
+      geom_hline(yintercept = postnatal_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    })
+     output$per_sti <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_sti)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of women \nwho have had a full \nSTI screening ", title = "STI screening") +
+      geom_hline(yintercept = sti_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    })
+      output$per_us <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_us)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of women who \nhave had an US scan", title = "Ultrasound") +
+      geom_hline(yintercept = us_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    })
+      output$per_education <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_education)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of women who \nbeen to an education session", title = "Education Sessions") +
+      geom_hline(yintercept = education_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    })
+      output$per_payment_transport <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_payment_transport)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of women \nwho have paid for transport", title = "Transportation Expenses") +
+      geom_hline(yintercept = payment_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    })
+      output$per_violence <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_violence)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of women who \nhave reported obstetric vioence", title = "Obstetric Violence") +
+      geom_hline(yintercept = violence_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    })
+      output$per_quality_of_care <- renderPlot({
+    ggplot(data, aes(x = , y = per_quality_of_care)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "Month", y = "Percentage of women who \nhave reported good quality of care", title = "Quality of Care") +
+      geom_hline(yintercept = quality_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    })
+      output$per_deaths_ix <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_deaths_ix)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of maternal \ndeaths investigated", title = "Maternal Death Investigations") +
+      geom_hline(yintercept = ix_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    })  
+       output$per_cause_death_changed <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_cause_death_changed)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of maternal mortality investigations \nthat results in a change in the primary cause of death", title = "Maternal Death Cause of \nDeath Change from Investigation") +
+      geom_hline(yintercept = ix_change_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    })  
+      output$per_cs <- renderPlot({
+    ggplot(data, aes(x = Month, y = per_cs)) +
+      geom_line() + 
+      theme_classic() +
+      labs(x = "", y = "Percentage of C-sections", title = "C-Sections") +
+      geom_hline(yintercept = cs_target, color = "darkred", linetype = "dashed") +  
+      graph_theme
+    }) 
+}
+
+
+ui <- dashboardPage(header, sidebar, body, skin = "black")
+
+shinyApp(ui, server)
+```
+
+
+```{r}
+ui <- dashboardPage(
+  dashboardHeader(title = "Basic dashboard"),
+  dashboardSidebar(),
+  dashboardBody(
+
+```
+
+
